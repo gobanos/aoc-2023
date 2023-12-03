@@ -1,4 +1,4 @@
-use crate::day2::parsers::games;
+use crate::day2::parser::games;
 use anyhow::Result;
 use aoc_runner_derive::{aoc, aoc_generator};
 use std::collections::HashMap;
@@ -28,7 +28,7 @@ enum Color {
 }
 
 #[aoc_generator(day2)]
-fn parser(input: &str) -> Result<Vec<Game>> {
+fn parse(input: &str) -> Result<Vec<Game>> {
     let (_, games) = games(input).map_err(|err| {
         err.map(|error| nom::error::Error::new(error.input.to_string(), error.code))
     })?;
@@ -72,24 +72,14 @@ fn part2(games: &[Game]) -> u32 {
         .sum()
 }
 
-mod parsers {
+mod parser {
     use crate::day2::{Color, Game, SetOfCubes};
+    use crate::nom_parser::number;
     use nom::branch::alt;
-    use nom::bytes::complete::{tag, take_while1};
-    use nom::error::ErrorKind;
+    use nom::bytes::complete::tag;
     use nom::multi::{separated_list0, separated_list1};
     use nom::IResult;
     use nom::Parser;
-
-    fn number(input: &str) -> IResult<&str, u32> {
-        let (input, number_str) = take_while1(|c: char| c.is_ascii_digit())(input)?;
-        Ok((
-            input,
-            number_str.parse().map_err(|_| {
-                nom::Err::Failure(nom::error::Error::new(number_str, ErrorKind::Fail))
-            })?,
-        ))
-    }
 
     fn color(input: &str) -> IResult<&str, (Color, u32)> {
         let (input, count) = number(input)?;
@@ -135,11 +125,11 @@ Game 5: 6 red, 1 blue, 3 green; 2 blue, 1 red, 2 green";
 
     #[test]
     fn part1_example() {
-        assert_eq!(part1(&parser(EXAMPLE).unwrap()), 8);
+        assert_eq!(part1(&parse(EXAMPLE).unwrap()), 8);
     }
 
     #[test]
     fn part2_example() {
-        assert_eq!(part2(&parser(EXAMPLE).unwrap()), 2286);
+        assert_eq!(part2(&parse(EXAMPLE).unwrap()), 2286);
     }
 }
