@@ -12,35 +12,28 @@ fn as_numeric(c: &u8) -> Option<u32> {
 fn parse_part1(input: &[u8]) -> Vec<(u32, u32)> {
     input
         .split(|&c| c == b'\n')
-        .map(|line| (
-            line.iter().find_map(as_numeric).unwrap(),
-            line.iter().rev().find_map(as_numeric).unwrap(),
-        ))
+        .map(|line| {
+            (
+                line.iter().find_map(as_numeric).unwrap(),
+                line.iter().rev().find_map(as_numeric).unwrap(),
+            )
+        })
         .collect()
 }
 
 #[aoc(day1, part1)]
 fn part1(input: &[(u32, u32)]) -> u32 {
-    input.iter()
-        .map(|(a, b)| a * 10 + b)
-        .sum()
+    input.iter().map(|(a, b)| a * 10 + b).sum()
 }
 
 const NUMBERS_IN_ENGLISH: &[&str] = &[
-    "one",
-    "two",
-    "three",
-    "four",
-    "five",
-    "six",
-    "seven",
-    "eight",
-    "nine",
+    "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
 ];
 
 #[aoc_generator(day1, part2)]
 fn parse_part2(input: &str) -> Vec<(u32, u32)> {
-    input.lines()
+    input
+        .lines()
         .map(|line| {
             let mut findings = Vec::new();
             for (index, number_str) in NUMBERS_IN_ENGLISH.iter().enumerate() {
@@ -75,9 +68,7 @@ fn parse_part2(input: &str) -> Vec<(u32, u32)> {
 
 #[aoc(day1, part2)]
 fn part2(input: &[(u32, u32)]) -> u32 {
-    input.iter()
-        .map(|(a, b)| a * 10 + b)
-        .sum()
+    input.iter().map(|(a, b)| a * 10 + b).sum()
 }
 
 #[cfg(test)]
