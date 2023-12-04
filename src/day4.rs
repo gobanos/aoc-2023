@@ -2,13 +2,13 @@ use anyhow::Result;
 use aoc_runner_derive::{aoc, aoc_generator};
 use std::collections::{HashSet, VecDeque};
 
-struct Card {
-    winning_numbers: HashSet<u32>,
-    my_numbers: HashSet<u32>,
+struct Card<Numbers> {
+    winning_numbers: Numbers,
+    my_numbers: Numbers,
 }
 
 #[aoc_generator(day4)]
-fn parse(input: &str) -> Result<Vec<Card>> {
+fn parse(input: &str) -> Result<Vec<Card<HashSet<u32>>>> {
     let (_, cards) = parser::cards(input).map_err(|err| {
         err.map(|error| nom::error::Error::new(error.input.to_string(), error.code))
     })?;
@@ -16,7 +16,7 @@ fn parse(input: &str) -> Result<Vec<Card>> {
 }
 
 #[aoc(day4, part1)]
-fn part1(cards: &[Card]) -> u32 {
+fn part1(cards: &[Card<HashSet<u32>>]) -> u32 {
     cards
         .iter()
         .map(|card| card.winning_numbers.intersection(&card.my_numbers).count())
@@ -28,7 +28,7 @@ fn part1(cards: &[Card]) -> u32 {
 }
 
 #[aoc(day4, part2)]
-fn part2(cards: &[Card]) -> u32 {
+fn part2(cards: &[Card<HashSet<u32>>]) -> u32 {
     let (_, score) = cards
         .iter()
         .map(|card| card.winning_numbers.intersection(&card.my_numbers).count())
@@ -37,6 +37,68 @@ fn part2(cards: &[Card]) -> u32 {
             |(mut stack, score), matching_numbers| {
                 let cards = stack.pop_front().unwrap_or(0) + 1;
                 for i in 0..matching_numbers {
+                    if let Some(c) = stack.get_mut(i) {
+                        *c += cards;
+                    } else {
+                        stack.push_back(cards);
+                    }
+                }
+                (stack, score + cards)
+            },
+        );
+    score
+}
+
+#[derive(Copy, Clone)]
+struct Bits(u128);
+
+impl FromIterator<u32> for Bits {
+    fn from_iter<T: IntoIterator<Item = u32>>(iter: T) -> Self {
+        let mut bits = 0;
+        for i in iter {
+            bits |= 1 << i;
+        }
+        Bits(bits)
+    }
+}
+
+impl Bits {
+    fn matching_bits(&self, other: &Self) -> u32 {
+        (self.0 & other.0).count_ones()
+    }
+}
+
+#[aoc_generator(day4, part1, bits)]
+#[aoc_generator(day4, part2, bits)]
+fn parse_bits(input: &str) -> Result<Vec<Card<Bits>>> {
+    let (_, cards) = parser::cards(input).map_err(|err| {
+        err.map(|error| nom::error::Error::new(error.input.to_string(), error.code))
+    })?;
+    Ok(cards)
+}
+
+#[aoc(day4, part1, bits)]
+fn part1_bits(cards: &[Card<Bits>]) -> u32 {
+    cards
+        .iter()
+        .map(|card| card.winning_numbers.matching_bits(&card.my_numbers))
+        .filter_map(|matching_numbers| match matching_numbers {
+            0 => None,
+            matches => Some(1 << (matches - 1)),
+        })
+        .sum()
+}
+
+#[aoc(day4, part2, bits)]
+fn part2_bits(cards: &[Card<Bits>]) -> u32 {
+    let (_, score) = cards
+        .iter()
+        .map(|card| card.winning_numbers.matching_bits(&card.my_numbers))
+        .fold(
+            (VecDeque::new(), 0),
+            |(mut stack, score), matching_numbers| {
+                let cards = stack.pop_front().unwrap_or(0) + 1;
+                for i in 0..matching_numbers as usize {
                     if let Some(c) = stack.get_mut(i) {
                         *c += cards;
                     } else {
@@ -62,7 +124,7 @@ mod parser {
         separated_list1(tag(" "), preceded(opt(tag(" ")), number))(input)
     }
 
-    fn card(input: &str) -> IResult<&str, Card> {
+    fn card<T: FromIterator<u32>>(input: &str) -> IResult<&str, Card<T>> {
         let (input, _) = tag("Card ")(input)?;
         let (input, _) = fold_many0(tag(" "), || (), |acc, _| acc)(input)?;
         let (input, _) = number(input)?;
@@ -79,7 +141,7 @@ mod parser {
         ))
     }
 
-    pub fn cards(input: &str) -> IResult<&str, Vec<Card>> {
+    pub fn cards<T: FromIterator<u32>>(input: &str) -> IResult<&str, Vec<Card<T>>> {
         separated_list1(tag("\n"), card)(input)
     }
 }

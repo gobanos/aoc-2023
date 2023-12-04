@@ -1,3 +1,5 @@
+use aho_corasick::AhoCorasick;
+use anyhow::{anyhow, Result};
 use aoc_runner_derive::{aoc, aoc_generator};
 
 fn as_numeric(c: &u8) -> Option<u32> {
@@ -71,6 +73,36 @@ fn part2(input: &[(u32, u32)]) -> u32 {
     input.iter().map(|(a, b)| a * 10 + b).sum()
 }
 
+const NUMBERS_IN_ENGLISH_AND_LITERAL: &[&str] = &[
+    "one", "1", "two", "2", "three", "3", "four", "4", "five", "5", "six", "6", "seven", "7",
+    "eight", "8", "nine", "9",
+];
+
+#[aoc_generator(day1, part2, aho)]
+fn parse_part2_aho_corasick(input: &str) -> Result<Vec<(u32, u32)>> {
+    let ac = AhoCorasick::new(NUMBERS_IN_ENGLISH_AND_LITERAL)?;
+
+    input
+        .lines()
+        .map(|line| {
+            let mut iter = ac.find_iter(line);
+            let first = iter
+                .next()
+                .ok_or_else(|| anyhow!("Could not find any number in {line}"))?;
+            let last = iter.last().unwrap_or(first);
+            Ok((
+                first.pattern().as_u32() / 2 + 1,
+                last.pattern().as_u32() / 2 + 1,
+            ))
+        })
+        .collect()
+}
+
+#[aoc(day1, part2, aho)]
+fn part2_aho_corasick(input: &[(u32, u32)]) -> u32 {
+    input.iter().map(|(a, b)| a * 10 + b).sum()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -96,5 +128,9 @@ zoneight234
     #[test]
     fn part2_example() {
         assert_eq!(part2(&parse_part2(EXAMPLE_PART2)), 281);
+        assert_eq!(
+            part2_aho_corasick(&parse_part2_aho_corasick(EXAMPLE_PART2).unwrap()),
+            281
+        );
     }
 }
