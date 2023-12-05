@@ -2,6 +2,10 @@ use crate::new_type;
 use crate::new_type::NewType;
 use anyhow::Result;
 use aoc_runner_derive::{aoc, aoc_generator};
+use std::cell::RefCell;
+use std::cmp::Ordering;
+use std::iter::{once, once_with};
+use std::ops::Range;
 
 struct Almanac {
     seeds: Vec<Seed>,
@@ -36,11 +40,9 @@ fn parse(input: &str) -> Result<Almanac> {
 fn map<A: NewType<u64>, B: NewType<u64>>(a: A, maps: &[(B, A, u64)]) -> B {
     maps.iter()
         .find_map(|&(dest, source, length)| {
-            if (source..source + length).contains(&a) {
-                Some(B::from((a - source).into()) + dest)
-            } else {
-                None
-            }
+            (source..source + length)
+                .contains(&a)
+                .then(|| B::from((a - source).into()) + dest)
         })
         .unwrap_or_else(|| B::from(a.into()))
 }
@@ -58,7 +60,9 @@ fn part1(almanac: &Almanac) -> Location {
         humidity_to_location,
     } = almanac;
 
-    seeds.iter().copied()
+    seeds
+        .iter()
+        .copied()
         .map(|s| map(s, seed_to_soil))
         .map(|s| map(s, soil_to_fertilizer))
         .map(|s| map(s, fertilizer_to_water))
@@ -66,7 +70,47 @@ fn part1(almanac: &Almanac) -> Location {
         .map(|s| map(s, light_to_temperature))
         .map(|s| map(s, temperature_to_humidity))
         .map(|s| map(s, humidity_to_location))
-        .min().unwrap()
+        .min()
+        .unwrap()
+}
+
+fn overlaps<T: NewType<u64>>(a: Range<T>, b: Range<T>) -> Option<Range<T>> {
+    // A1.......A2  B1....B2  => None
+    // B1....B2   A1.......A2 => None
+    // A1.....B1..A2..B2      => B1..A2
+    // B1...A1..B2....A2      => A1..B2
+    // A1...B1....B2....A2    => B1..B2
+    // B1...A1....A2....B2    => A1..A2
+
+    match (a.end.cmp(&b.start), a.start.cmp(&b.end)) {
+        (Ordering::Less | Ordering::Equal, _) | (_, Ordering::Greater | Ordering::Equal) => None,
+        (Ordering::Greater, Ordering::Less) => Some(T::max(a.start, b.start)..T::min(a.end, b.end)),
+    }
+}
+
+fn map_range<A: NewType<u64>, B: NewType<u64>>(
+    range: Range<A>,
+    maps: &[(B, A, u64)],
+) -> Vec<Range<B>> {
+    let range = RefCell::new(range);
+    maps.iter()
+        .filter_map(|&(dest, source, length)| {
+            overlaps(range.borrow().clone(), source..source + length)
+                .map(|overlap| (overlap, source, dest))
+        })
+        .flat_map(|(overlap, source, dest)| {
+            let before = B::from(range.borrow().start.into())..B::from(overlap.start.into());
+            let mapped_start = B::from((overlap.start - source).into()) + dest;
+            let mapped_end = B::from((overlap.end - source).into()) + dest;
+
+            range.borrow_mut().start = overlap.end;
+            once(before).chain(once(mapped_start..mapped_end))
+        })
+        .chain(once_with(|| {
+            B::from(range.borrow().start.into())..B::from(range.borrow().end.into())
+        }))
+        .filter(|range| !range.is_empty())
+        .collect()
 }
 
 #[aoc(day5, part2)]
@@ -81,21 +125,23 @@ fn part2(almanac: &Almanac) -> Location {
         temperature_to_humidity,
         humidity_to_location,
     } = almanac;
-    seeds.chunks(2)
-        .flat_map(|seeds| {
-            let base: u64 = seeds[0].into();
-            let length: u64 = seeds[1].into();
-            (base..base+length)
-                .map(Seed)
+    seeds
+        .chunks(2)
+        .map(|seeds| {
+            let base = seeds[0];
+            let length = seeds[1];
+            base..base + length
         })
-        .map(|s| map(s, seed_to_soil))
-        .map(|s| map(s, soil_to_fertilizer))
-        .map(|s| map(s, fertilizer_to_water))
-        .map(|s| map(s, water_to_light))
-        .map(|s| map(s, light_to_temperature))
-        .map(|s| map(s, temperature_to_humidity))
-        .map(|s| map(s, humidity_to_location))
-        .min().unwrap()
+        .flat_map(|r| map_range(r, seed_to_soil))
+        .flat_map(|r| map_range(r, soil_to_fertilizer))
+        .flat_map(|r| map_range(r, fertilizer_to_water))
+        .flat_map(|r| map_range(r, water_to_light))
+        .flat_map(|r| map_range(r, light_to_temperature))
+        .flat_map(|r| map_range(r, temperature_to_humidity))
+        .flat_map(|r| map_range(r, humidity_to_location))
+        .map(|r| r.start)
+        .min()
+        .unwrap()
 }
 
 mod parser {
@@ -121,25 +167,32 @@ mod parser {
         let (input, seeds) = separated_list1(tag(" "), number)(input)?;
 
         let (input, _) = tag("\n\nseed-to-soil map:\n")(input)?;
-        let (input, seed_to_soil) = separated_list1(tag("\n"), map_tuple)(input)?;
+        let (input, mut seed_to_soil) = separated_list1(tag("\n"), map_tuple)(input)?;
+        seed_to_soil.sort_by_key(|&(_, k, _)| k);
 
         let (input, _) = tag("\n\nsoil-to-fertilizer map:\n")(input)?;
-        let (input, soil_to_fertilizer) = separated_list1(tag("\n"), map_tuple)(input)?;
+        let (input, mut soil_to_fertilizer) = separated_list1(tag("\n"), map_tuple)(input)?;
+        soil_to_fertilizer.sort_by_key(|&(_, k, _)| k);
 
         let (input, _) = tag("\n\nfertilizer-to-water map:\n")(input)?;
-        let (input, fertilizer_to_water) = separated_list1(tag("\n"), map_tuple)(input)?;
+        let (input, mut fertilizer_to_water) = separated_list1(tag("\n"), map_tuple)(input)?;
+        fertilizer_to_water.sort_by_key(|&(_, k, _)| k);
 
         let (input, _) = tag("\n\nwater-to-light map:\n")(input)?;
-        let (input, water_to_light) = separated_list1(tag("\n"), map_tuple)(input)?;
+        let (input, mut water_to_light) = separated_list1(tag("\n"), map_tuple)(input)?;
+        water_to_light.sort_by_key(|&(_, k, _)| k);
 
         let (input, _) = tag("\n\nlight-to-temperature map:\n")(input)?;
-        let (input, light_to_temperature) = separated_list1(tag("\n"), map_tuple)(input)?;
+        let (input, mut light_to_temperature) = separated_list1(tag("\n"), map_tuple)(input)?;
+        light_to_temperature.sort_by_key(|&(_, k, _)| k);
 
         let (input, _) = tag("\n\ntemperature-to-humidity map:\n")(input)?;
-        let (input, temperature_to_humidity) = separated_list1(tag("\n"), map_tuple)(input)?;
+        let (input, mut temperature_to_humidity) = separated_list1(tag("\n"), map_tuple)(input)?;
+        temperature_to_humidity.sort_by_key(|&(_, k, _)| k);
 
         let (input, _) = tag("\n\nhumidity-to-location map:\n")(input)?;
-        let (input, humidity_to_location) = separated_list1(tag("\n"), map_tuple)(input)?;
+        let (input, mut humidity_to_location) = separated_list1(tag("\n"), map_tuple)(input)?;
+        humidity_to_location.sort_by_key(|&(_, k, _)| k);
 
         Ok((
             input,

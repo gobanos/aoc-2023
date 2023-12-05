@@ -52,9 +52,9 @@ macro_rules! new_type {
                 }
             }
 
-            impl Into<$ty> for $name {
-                fn into(self) -> $ty {
-                    self.0
+            impl From<$name> for $ty {
+                fn from(value: $name) -> Self {
+                    value.0
                 }
             }
 
