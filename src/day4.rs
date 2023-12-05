@@ -127,7 +127,7 @@ mod parser {
     fn card<T: FromIterator<u32>>(input: &str) -> IResult<&str, Card<T>> {
         let (input, _) = tag("Card ")(input)?;
         let (input, _) = fold_many0(tag(" "), || (), |acc, _| acc)(input)?;
-        let (input, _) = number(input)?;
+        let (input, _) = number::<u32>(input)?;
         let (input, _) = tag(": ")(input)?;
         let (input, winning_numbers) = numbers(input)?;
         let (input, _) = tag(" | ")(input)?;
