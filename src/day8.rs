@@ -1,8 +1,8 @@
+use anyhow::Result;
+use aoc_runner_derive::{aoc, aoc_generator};
+use num::integer::lcm;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
-use aoc_runner_derive::{aoc, aoc_generator};
-use anyhow::Result;
-use num::integer::lcm;
 
 #[derive(Copy, Clone, Debug)]
 enum Direction {
@@ -64,7 +64,9 @@ fn part1(map: &Map) -> usize {
 fn part2(map: &Map) -> usize {
     let nodes: HashMap<_, _> = map.nodes.iter().copied().collect();
 
-    nodes.keys().filter(|node| matches!(node, Node([_, _, b'A'])))
+    nodes
+        .keys()
+        .filter(|node| matches!(node, Node([_, _, b'A'])))
         .copied()
         .map(|mut current_node| {
             for (i, direction) in map.directions.iter().cycle().enumerate() {
@@ -79,14 +81,14 @@ fn part2(map: &Map) -> usize {
 }
 
 mod parser {
+    use crate::day8::{Direction, Map, Node};
     use nom::branch::alt;
     use nom::bytes::complete::{tag, take};
     use nom::character::complete::newline;
     use nom::combinator::{map, map_res};
-    use nom::IResult;
     use nom::multi::{many1, many1_count, separated_list1};
     use nom::sequence::{delimited, pair, separated_pair};
-    use crate::day8::{Direction, Map, Node};
+    use nom::IResult;
 
     fn node(input: &str) -> IResult<&str, Node> {
         map_res(take(3usize), |s: &str| s.as_bytes().try_into().map(Node))(input)
@@ -99,29 +101,23 @@ mod parser {
         )))(input)?;
         let (input, _) = many1_count(newline)(input)?;
 
-        let (input, nodes) = separated_list1(newline, pair(
-            node,
-            delimited(
-                tag(" = ("),
-                map(
-                    separated_pair(
-                        node,
-                        tag(", "),
-                        node
-                    ),
-                    |(left, right)| [left, right]
+        let (input, nodes) = separated_list1(
+            newline,
+            pair(
+                node,
+                delimited(
+                    tag(" = ("),
+                    map(separated_pair(node, tag(", "), node), |(left, right)| {
+                        [left, right]
+                    }),
+                    tag(")"),
                 ),
-                tag(")"),
-            )
-        ))(input)?;
+            ),
+        )(input)?;
 
-        Ok((input, Map {
-            directions,
-            nodes,
-        }))
+        Ok((input, Map { directions, nodes }))
     }
 }
-
 
 #[cfg(test)]
 mod tests {
