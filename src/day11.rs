@@ -46,9 +46,9 @@ fn solve<const VOID: u64>(galaxies: &[(X, Y)]) -> u64 {
                 .take(diff_x.into())
                 .sum::<u64>()
                 + successors(Some(min_y), |&y| Some(y + 1))
-                .map(|y| if seen_y[y.0] { 1u64 } else { VOID })
-                .take(diff_y.into())
-                .sum::<u64>()
+                    .map(|y| if seen_y[y.0] { 1u64 } else { VOID })
+                    .take(diff_y.into())
+                    .sum::<u64>()
         })
         .sum()
 }
